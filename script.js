@@ -19,6 +19,8 @@ const fingerIndicators = document.querySelectorAll('.finger-dot');
 let currentColor = 0;
 let camera = null;
 let hands = null;
+let manualStreamActive = false;
+let manualStream = null;
 
 // Initialize Hands model
 async function initializeHands() {
@@ -53,6 +55,11 @@ async function setupCamera() {
 // Initialize camera and start detection
 async function initializeCamera() {
     try {
+        if (manualStreamActive) {
+            // manual stream is already feeding video; don't reinitialize MediaPipe Camera
+            console.log('Manual stream active - skipping MediaPipe Camera initialization');
+            return;
+        }
         await setupCamera();
         await camera.initialize();
         
@@ -73,6 +80,34 @@ async function initializeCamera() {
     } catch (err) {
         showError('Camera access denied. Please allow camera permissions.');
         console.error('Camera initialization error:', err);
+    }
+}
+
+// Start processing a MediaStream directly (used for mobile after user gesture)
+async function startStreamProcessing(stream) {
+    try {
+        manualStreamActive = true;
+        manualStream = stream;
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        // Process frames using MediaPipe Hands directly in a RAF loop
+        async function processFrame() {
+            try {
+                if (hands && videoElement.readyState >= 2) {
+                    await hands.send({ image: videoElement });
+                }
+            } catch (e) {
+                console.error('Frame processing error:', e);
+            }
+            if (manualStreamActive) requestAnimationFrame(processFrame);
+        }
+
+        requestAnimationFrame(processFrame);
+        console.log('Manual stream processing started');
+    } catch (err) {
+        console.error('startStreamProcessing error:', err);
+        showError('Failed to start camera stream.');
     }
 }
 
@@ -248,7 +283,6 @@ function showError(message) {
     }, 5000);
 }
 
-// Prevent default touch behaviors on mobile
 document.addEventListener('touchmove', (e) => {
     if (e.target.closest('.video-container')) {
         e.preventDefault();
@@ -260,7 +294,6 @@ document.addEventListener('dblclick', (e) => {
     e.preventDefault();
 });
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         // Disable zoom on mobile
@@ -269,7 +302,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         await initializeHands();
-        await initializeCamera();
+
+        // Permissions API check - if camera permission already granted, auto-start
+        let permissionGranted = false;
+        if (navigator.permissions && navigator.permissions.query) {
+            try {
+                const status = await navigator.permissions.query({ name: 'camera' });
+                if (status.state === 'granted') permissionGranted = true;
+                // listen for change (optional)
+                status.onchange = () => {
+                    if (status.state === 'granted') {
+                        initializeCamera();
+                        const m = document.getElementById('mobileStart');
+                        if (m) m.style.display = 'none';
+                    }
+                };
+            } catch (e) {
+                // Permissions API may not support 'camera' in all browsers
+                console.log('Permissions API camera query not supported', e);
+            }
+        }
+
+        const mobileStart = document.getElementById('mobileStart');
+        if (permissionGranted) {
+            // auto-start camera when permission already granted
+            await initializeCamera();
+            if (mobileStart) mobileStart.style.display = 'none';
+        } else {
+            // show mobile overlay if available - user must gesture to allow camera on many phones
+            if (mobileStart) mobileStart.style.display = 'block';
+        }
+
         console.log('Application initialized successfully');
     } catch (err) {
         console.error('Initialization error:', err);
@@ -282,14 +345,25 @@ window.addEventListener('beforeunload', () => {
     if (camera) {
         camera.stop();
     }
+    if (manualStreamActive && manualStream) {
+        manualStream.getTracks().forEach(t => t.stop());
+    }
 });
 
 // Handle visibility change to pause/resume detection
 document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
         if (camera) camera.stop();
+        if (manualStreamActive && manualStream) {
+            manualStream.getTracks().forEach(t => t.enabled = false);
+            try { videoElement.pause(); } catch (e) {}
+        }
     } else {
         if (camera) camera.start();
+        if (manualStreamActive && manualStream) {
+            manualStream.getTracks().forEach(t => t.enabled = true);
+            try { videoElement.play(); } catch (e) {}
+        }
     }
 });
 
@@ -308,3 +382,31 @@ window.addEventListener('resume', () => {
 window.addEventListener('pause', () => {
     if (camera) camera.stop();
 });
+
+// Mobile start button: request camera permission on user gesture
+const mobileStart = document.getElementById('mobileStart');
+if (mobileStart) {
+    mobileStart.addEventListener('click', async () => {
+        try {
+            mobileStart.textContent = 'Requesting...';
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showError('Camera API not available on this device/browser.');
+                mobileStart.textContent = 'Tap to enable camera';
+                return;
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+
+            // Start processing the granted stream directly
+            if (!hands) await initializeHands();
+            await startStreamProcessing(stream);
+
+            mobileStart.style.display = 'none';
+        } catch (err) {
+            console.error('Permission error:', err);
+            mobileStart.textContent = 'Tap to enable camera';
+            showError('Camera permission denied or unavailable.');
+        }
+    });
+}
