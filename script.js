@@ -306,39 +306,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         await initializeHands();
 
-        // Permissions API check - if camera permission already granted, auto-start
-        let permissionGranted = false;
-        if (navigator.permissions && navigator.permissions.query) {
-            try {
-                const status = await navigator.permissions.query({ name: 'camera' });
-                if (status.state === 'granted') permissionGranted = true;
-                // listen for change (optional)
-                status.onchange = () => {
-                    if (status.state === 'granted') {
-                        initializeCamera();
-                        const m = document.getElementById('mobileStart');
-                        if (m) m.style.display = 'none';
-                    }
-                };
-            } catch (e) {
-                // Permissions API may not support 'camera' in all browsers
-                console.log('Permissions API camera query not supported', e);
-            }
-        }
-
         const mobileStart = document.getElementById('mobileStart');
-        if (permissionGranted) {
-            // auto-start camera when permission already granted
-            await initializeCamera();
-            if (mobileStart) mobileStart.style.display = 'none';
-        } else {
-            // show mobile overlay if available - user must gesture to allow camera on many phones
-            if (mobileStart) mobileStart.style.display = 'block';
-        }
 
-        // If we're inside a known in-app browser, show the notice immediately
+        // If in-app browser detected, show notice directly - don't try auto-start
         if (isInAppBrowser()) {
+            if (mobileStart) mobileStart.style.display = 'block';
             showInAppNotice();
+            console.log('In-app browser detected. Showing manual start option.');
+        } else {
+            // Not in-app browser - try Permissions API for auto-start, or show button
+            let permissionGranted = false;
+            if (navigator.permissions && navigator.permissions.query) {
+                try {
+                    const status = await navigator.permissions.query({ name: 'camera' });
+                    if (status.state === 'granted') permissionGranted = true;
+                    // listen for change (optional)
+                    status.onchange = () => {
+                        if (status.state === 'granted') {
+                            initializeCamera();
+                            if (mobileStart) mobileStart.style.display = 'none';
+                        }
+                    };
+                } catch (e) {
+                    // Permissions API may not support 'camera' in all browsers
+                    console.log('Permissions API camera query not supported', e);
+                }
+            }
+
+            if (permissionGranted) {
+                // auto-start camera when permission already granted
+                await initializeCamera();
+                if (mobileStart) mobileStart.style.display = 'none';
+            } else {
+                // show mobile overlay - user must tap to allow camera
+                if (mobileStart) mobileStart.style.display = 'block';
+            }
         }
 
         console.log('Application initialized successfully');
@@ -397,24 +399,40 @@ if (mobileStart) {
     mobileStart.addEventListener('click', async () => {
         try {
             mobileStart.textContent = 'Requesting...';
+            mobileStart.disabled = true;
 
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 showError('Camera API not available on this device/browser.');
                 mobileStart.textContent = 'Tap to enable camera';
+                mobileStart.disabled = false;
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            // Request permission with front camera (user facing) by default
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user' } 
+            });
 
             // Start processing the granted stream directly
             if (!hands) await initializeHands();
             await startStreamProcessing(stream);
 
             mobileStart.style.display = 'none';
+            hideInAppNotice();
         } catch (err) {
             console.error('Permission error:', err);
             mobileStart.textContent = 'Tap to enable camera';
-            showError('Camera permission denied or unavailable.');
+            mobileStart.disabled = false;
+            
+            // Provide specific error messages
+            if (err.name === 'NotAllowedError') {
+                showError('Camera permission denied. Try again and allow access.');
+            } else if (err.name === 'NotFoundError') {
+                showError('No camera found on this device.');
+            } else {
+                showError('Camera access failed. Please try again.');
+            }
+            
             // If in-app browser, show the notice explaining to open in Safari
             if (isInAppBrowser()) {
                 showInAppNotice();
@@ -485,26 +503,27 @@ const openExternalBtn = document.getElementById('openExternal');
 const dismissInAppBtn = document.getElementById('dismissInApp');
 if (openExternalBtn) {
     openExternalBtn.addEventListener('click', () => {
-        // Try to open in external browser/tab
+        // First, try window.open
         try {
-            const opened = window.open(window.location.href, '_blank');
-            if (!opened) {
-                // popup blocked - copy URL to clipboard and instruct user
-                throw new Error('popup-blocked');
+            const opened = window.open(window.location.href, '_blank', 'noopener,noreferrer');
+            if (opened) {
+                console.log('Opened in new tab/browser');
+                return;
             }
-            return;
         } catch (e) {
-            // fallback: copy URL to clipboard and explain how to open in Safari
-            const url = window.location.href;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(() => {
-                    alert('URL copied to clipboard. Open Safari, paste the link, and load it to enable camera access.');
-                }).catch(() => {
-                    alert('Copy failed. Please long-press the link and choose "Open in Safari" or copy the URL manually.');
-                });
-            } else {
-                alert('Please open this page in Safari or your device browser for camera access.');
-            }
+            console.log('window.open failed:', e);
+        }
+
+        // Fallback: copy URL to clipboard or show instructions
+        const url = window.location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('✓ URL copied!\n\nNow:\n1. Open Safari\n2. Paste the URL in address bar\n3. Tap to run and allow camera');
+            }).catch(() => {
+                alert('Please:\n1. Long-press this link\n2. Choose "Open in Safari"\n3. Then allow camera access');
+            });
+        } else {
+            alert('Please open this page in Safari for full camera support.\n\nURL: ' + url);
         }
     });
 }
