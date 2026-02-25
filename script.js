@@ -333,6 +333,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (mobileStart) mobileStart.style.display = 'block';
         }
 
+        // If we're inside a known in-app browser, show the notice immediately
+        if (isInAppBrowser()) {
+            showInAppNotice();
+        }
+
         console.log('Application initialized successfully');
     } catch (err) {
         console.error('Initialization error:', err);
@@ -444,10 +449,24 @@ if (openExternalBtn) {
     openExternalBtn.addEventListener('click', () => {
         // Try to open in external browser/tab
         try {
-            window.open(window.location.href, '_blank');
+            const opened = window.open(window.location.href, '_blank');
+            if (!opened) {
+                // popup blocked - copy URL to clipboard and instruct user
+                throw new Error('popup-blocked');
+            }
+            return;
         } catch (e) {
-            // fallback: instruct user to manually open in Safari
-            alert('Please open this page in Safari or your device browser for camera access.');
+            // fallback: copy URL to clipboard and explain how to open in Safari
+            const url = window.location.href;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    alert('URL copied to clipboard. Open Safari, paste the link, and load it to enable camera access.');
+                }).catch(() => {
+                    alert('Copy failed. Please long-press the link and choose "Open in Safari" or copy the URL manually.');
+                });
+            } else {
+                alert('Please open this page in Safari or your device browser for camera access.');
+            }
         }
     });
 }
