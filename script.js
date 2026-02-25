@@ -308,39 +308,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const mobileStart = document.getElementById('mobileStart');
 
-        // If in-app browser detected, show notice directly - don't try auto-start
-        if (isInAppBrowser()) {
-            if (mobileStart) mobileStart.style.display = 'block';
-            showInAppNotice();
-            console.log('In-app browser detected. Showing manual start option.');
-        } else {
-            // Not in-app browser - try Permissions API for auto-start, or show button
-            let permissionGranted = false;
-            if (navigator.permissions && navigator.permissions.query) {
-                try {
-                    const status = await navigator.permissions.query({ name: 'camera' });
-                    if (status.state === 'granted') permissionGranted = true;
-                    // listen for change (optional)
-                    status.onchange = () => {
-                        if (status.state === 'granted') {
-                            initializeCamera();
-                            if (mobileStart) mobileStart.style.display = 'none';
-                        }
-                    };
-                } catch (e) {
-                    // Permissions API may not support 'camera' in all browsers
-                    console.log('Permissions API camera query not supported', e);
-                }
+        // Try Permissions API for auto-start, or show button
+        let permissionGranted = false;
+        if (navigator.permissions && navigator.permissions.query) {
+            try {
+                const status = await navigator.permissions.query({ name: 'camera' });
+                if (status.state === 'granted') permissionGranted = true;
+                // listen for change (optional)
+                status.onchange = () => {
+                    if (status.state === 'granted') {
+                        initializeCamera();
+                        if (mobileStart) mobileStart.style.display = 'none';
+                    }
+                };
+            } catch (e) {
+                // Permissions API may not support 'camera' in all browsers
+                console.log('Permissions API camera query not supported', e);
             }
+        }
 
-            if (permissionGranted) {
-                // auto-start camera when permission already granted
-                await initializeCamera();
-                if (mobileStart) mobileStart.style.display = 'none';
-            } else {
-                // show mobile overlay - user must tap to allow camera
-                if (mobileStart) mobileStart.style.display = 'block';
-            }
+        if (permissionGranted) {
+            // auto-start camera when permission already granted
+            await initializeCamera();
+            if (mobileStart) mobileStart.style.display = 'none';
+        } else {
+            // show mobile overlay - user must tap to allow camera
+            if (mobileStart) mobileStart.style.display = 'block';
         }
 
         console.log('Application initialized successfully');
