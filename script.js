@@ -411,7 +411,6 @@ if (mobileStart) {
             await startStreamProcessing(stream);
 
             mobileStart.style.display = 'none';
-            hideInAppNotice();
         } catch (err) {
             console.error('Permission error:', err);
             mobileStart.textContent = 'Tap to enable camera';
@@ -424,11 +423,6 @@ if (mobileStart) {
                 showError('No camera found on this device.');
             } else {
                 showError('Camera access failed. Please try again.');
-            }
-            
-            // If in-app browser, show the notice explaining to open in Safari
-            if (isInAppBrowser()) {
-                showInAppNotice();
             }
         }
     });
@@ -474,56 +468,6 @@ function isInAppBrowser() {
     const ua = navigator.userAgent || '';
     // common markers: FBAN, FBAV, Instagram, Messenger, Line
     return /FBAN|FBAV|Instagram|Messenger|Line|Twitter|FB_IAB|FB4A|Instagram|WhatsApp/i.test(ua);
-}
-
-// Show/hide the in-app browser notice
-function showInAppNotice() {
-    const notice = document.getElementById('inAppNotice');
-    if (!notice) return;
-    notice.style.display = 'block';
-    notice.setAttribute('aria-hidden', 'false');
-}
-
-function hideInAppNotice() {
-    const notice = document.getElementById('inAppNotice');
-    if (!notice) return;
-    notice.style.display = 'none';
-    notice.setAttribute('aria-hidden', 'true');
-}
-
-// Wire up in-app notice buttons
-const openExternalBtn = document.getElementById('openExternal');
-const dismissInAppBtn = document.getElementById('dismissInApp');
-if (openExternalBtn) {
-    openExternalBtn.addEventListener('click', () => {
-        // First, try window.open
-        try {
-            const opened = window.open(window.location.href, '_blank', 'noopener,noreferrer');
-            if (opened) {
-                console.log('Opened in new tab/browser');
-                return;
-            }
-        } catch (e) {
-            console.log('window.open failed:', e);
-        }
-
-        // Fallback: copy URL to clipboard or show instructions
-        const url = window.location.href;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(() => {
-                alert('✓ URL copied!\n\nNow:\n1. Open Safari\n2. Paste the URL in address bar\n3. Tap to run and allow camera');
-            }).catch(() => {
-                alert('Please:\n1. Long-press this link\n2. Choose "Open in Safari"\n3. Then allow camera access');
-            });
-        } else {
-            alert('Please open this page in Safari for full camera support.\n\nURL: ' + url);
-        }
-    });
-}
-if (dismissInAppBtn) {
-    dismissInAppBtn.addEventListener('click', () => {
-        hideInAppNotice();
-    });
 }
 
 // Wire up camera toggle button
