@@ -1,0 +1,310 @@
+// Finger color mapping
+const fingerColors = {
+    0: { name: 'Red', hex: '#FF3D5C', gradient: 'linear-gradient(135deg, #FF3D5C, #FF6B7A)' },
+    1: { name: 'Gold', hex: '#FFB800', gradient: 'linear-gradient(135deg, #FFB800, #FFC800)' },
+    2: { name: 'Cyan', hex: '#00D9FF', gradient: 'linear-gradient(135deg, #00D9FF, #00F0FF)' },
+    3: { name: 'Purple', hex: '#6B4EFF', gradient: 'linear-gradient(135deg, #6B4EFF, #9B7AFF)' },
+    4: { name: 'Green', hex: '#00D166', gradient: 'linear-gradient(135deg, #00D166, #4AFF00)' }
+};
+
+const videoElement = document.getElementById('video');
+const canvasElement = document.getElementById('canvas');
+const ctx = canvasElement.getContext('2d', { willReadFrequently: true });
+const gemElement = document.getElementById('gem');
+const colorNameElement = document.getElementById('colorName');
+const colorCodeElement = document.getElementById('colorCode');
+const errorMessageElement = document.getElementById('errorMessage');
+const fingerIndicators = document.querySelectorAll('.finger-dot');
+
+let currentColor = 0;
+let camera = null;
+let hands = null;
+
+// Initialize Hands model
+async function initializeHands() {
+    hands = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`,
+    });
+
+    hands.setOptions({
+        maxNumHands: 2,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+    console.log('Hands model initialized');
+}
+
+// Setup camera
+async function setupCamera() {
+    camera = new Camera(videoElement, {
+        onFrame: async () => {
+            if (hands) {
+                await hands.send({ image: videoElement });
+            }
+        },
+        width: 640,
+        height: 480
+    });
+}
+
+// Initialize camera and start detection
+async function initializeCamera() {
+    try {
+        await setupCamera();
+        await camera.initialize();
+        
+        // Wait for camera to be ready
+        await new Promise(resolve => {
+            const checkReady = () => {
+                if (videoElement.videoWidth > 0) {
+                    resolve();
+                } else {
+                    setTimeout(checkReady, 100);
+                }
+            };
+            checkReady();
+        });
+
+        camera.start();
+        console.log('Camera initialized and started');
+    } catch (err) {
+        showError('Camera access denied. Please allow camera permissions.');
+        console.error('Camera initialization error:', err);
+    }
+}
+
+// Set canvas size
+function resizeCanvasToDisplaySize() {
+    const container = canvasElement.parentElement;
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+
+    if (canvasElement.width !== width || canvasElement.height !== height) {
+        canvasElement.width = width;
+        canvasElement.height = height;
+    }
+}
+
+// Results handler
+function onResults(results) {
+    resizeCanvasToDisplaySize();
+    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        console.log('Hands detected:', results.multiHandLandmarks.length);
+        const landmarks = results.multiHandLandmarks[0];
+        const handedness = results.multiHandedness[0];
+
+        // Draw hand connections
+        drawHandConnections(landmarks);
+
+        // Detect which fingers are raised
+        detectRaisedFingers(landmarks);
+    }
+}
+
+function drawHandConnections(landmarks) {
+    const connections = [
+        [0, 1], [1, 2], [2, 3], [3, 4],           // Thumb
+        [0, 5], [5, 6], [6, 7], [7, 8],           // Index
+        [0, 9], [9, 10], [10, 11], [11, 12],      // Middle
+        [0, 13], [13, 14], [14, 15], [15, 16],    // Ring
+        [0, 17], [17, 18], [18, 19], [19, 20]     // Pinky
+    ];
+
+    ctx.strokeStyle = 'rgba(107, 78, 255, 0.8)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Draw connections
+    for (const connection of connections) {
+        const start = landmarks[connection[0]];
+        const end = landmarks[connection[1]];
+
+        const startX = start.x * canvasElement.width;
+        const startY = start.y * canvasElement.height;
+        const endX = end.x * canvasElement.width;
+        const endY = end.y * canvasElement.height;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+    }
+
+    // Draw landmarks with gradient colors
+    for (let i = 0; i < landmarks.length; i++) {
+        const landmark = landmarks[i];
+        const x = landmark.x * canvasElement.width;
+        const y = landmark.y * canvasElement.height;
+
+        // Different colors for different parts
+        if (i < 4) ctx.fillStyle = 'rgba(255, 61, 92, 0.9)'; // Thumb - Red
+        else if (i < 8) ctx.fillStyle = 'rgba(255, 184, 0, 0.9)'; // Index - Gold
+        else if (i < 12) ctx.fillStyle = 'rgba(0, 217, 255, 0.9)'; // Middle - Cyan
+        else if (i < 16) ctx.fillStyle = 'rgba(107, 78, 255, 0.9)'; // Ring - Purple
+        else ctx.fillStyle = 'rgba(0, 209, 102, 0.9)'; // Pinky - Green
+
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Outer ring
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    console.log('Landmarks drawn:', landmarks.length);
+}
+
+function detectRaisedFingers(landmarks) {
+    // Finger tip indices: thumb=4, index=8, middle=12, ring=16, pinky=20
+    // We check if the tip is higher than the PIP joint
+    const fingerTips = [4, 8, 12, 16, 20];
+    const fingerPIPs = [3, 6, 10, 14, 18];
+
+    let raisedFingers = [];
+
+    for (let i = 0; i < fingerTips.length; i++) {
+        const tip = landmarks[fingerTips[i]];
+        const pip = landmarks[fingerPIPs[i]];
+
+        // Check if finger tip is higher (lower y value) than PIP joint
+        if (tip.y < pip.y - 0.05) {
+            raisedFingers.push(i);
+        }
+    }
+
+    // Update gem color based on detected finger
+    if (raisedFingers.length > 0) {
+        const dominantFinger = raisedFingers[0];
+        updateGemColor(dominantFinger);
+        displayFingerIndicators(raisedFingers, landmarks);
+    }
+}
+
+function updateGemColor(fingerIndex) {
+    if (fingerIndex !== currentColor) {
+        currentColor = fingerIndex;
+
+        const color = fingerColors[fingerIndex];
+        const gem = document.querySelector('#gem');
+
+        // Update gem gradient
+        gem.style.background = color.gradient;
+
+        // Update color info
+        colorNameElement.textContent = color.name;
+        colorCodeElement.textContent = color.hex;
+        colorCodeElement.style.color = color.hex;
+        colorCodeElement.style.borderColor = color.hex;
+        colorCodeElement.style.background = `${color.hex}15`;
+
+        // Add animation
+        gem.style.animation = 'none';
+        setTimeout(() => {
+            gem.style.animation = 'float 3s ease-in-out infinite';
+        }, 10);
+    }
+}
+
+function displayFingerIndicators(raisedFingers, landmarks) {
+    const fingerTips = [4, 8, 12, 16, 20];
+
+    // Reset all indicators first
+    fingerIndicators.forEach(indicator => indicator.classList.remove('active'));
+
+    raisedFingers.forEach(fingerIndex => {
+        const tip = landmarks[fingerTips[fingerIndex]];
+        const indicator = fingerIndicators[fingerIndex];
+
+        // Position indicator relative to canvas
+        const container = canvasElement.parentElement;
+        const x = tip.x * container.clientWidth;
+        const y = tip.y * container.clientHeight;
+
+        indicator.style.left = (x - 7.5) + 'px';
+        indicator.style.top = (y - 7.5) + 'px';
+        indicator.classList.add('active');
+
+        // Update indicator class for correct styling
+        indicator.classList.remove('thumb', 'index', 'middle', 'ring', 'pinky');
+        const fingerClasses = ['thumb', 'index', 'middle', 'ring', 'pinky'];
+        indicator.classList.add(fingerClasses[fingerIndex]);
+    });
+}
+
+function showError(message) {
+    errorMessageElement.textContent = message;
+    errorMessageElement.classList.add('show');
+
+    setTimeout(() => {
+        errorMessageElement.classList.remove('show');
+    }, 5000);
+}
+
+// Prevent default touch behaviors on mobile
+document.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.video-container')) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+// Prevent zoom on double tap
+document.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        // Disable zoom on mobile
+        document.addEventListener('gesturestart', (e) => {
+            e.preventDefault();
+        });
+
+        await initializeHands();
+        await initializeCamera();
+        console.log('Application initialized successfully');
+    } catch (err) {
+        console.error('Initialization error:', err);
+        showError('Failed to initialize application. Please refresh the page.');
+    }
+});
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    if (camera) {
+        camera.stop();
+    }
+});
+
+// Handle visibility change to pause/resume detection
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        if (camera) camera.stop();
+    } else {
+        if (camera) camera.start();
+    }
+});
+
+// Handle orientation change for mobile
+window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+        resizeCanvasToDisplaySize();
+    }, 100);
+});
+
+// Handle screen lock/unlock on mobile
+window.addEventListener('resume', () => {
+    if (camera) camera.start();
+});
+
+window.addEventListener('pause', () => {
+    if (camera) camera.stop();
+});

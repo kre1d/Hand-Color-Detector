@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gem Detector">
+    <meta name="theme-color" content="#0B1929">
+    <title>Marvel Hand Detector - Gem Collector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ GEM COLOR ✨</h1>
+            <p>Show your fingers to show colors!</p>
+        </div>
+
+        <div class="content-wrapper">
+            <!-- Camera Feed Section -->
+            <div class="camera-section">
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas"></canvas>
+                    <div class="finger-indicators">
+                        <div class="finger-dot thumb" data-finger="0"></div>
+                        <div class="finger-dot index" data-finger="1"></div>
+                        <div class="finger-dot middle" data-finger="2"></div>
+                        <div class="finger-dot ring" data-finger="3"></div>
+                        <div class="finger-dot pinky" data-finger="4"></div>
+                    </div>
+                </div>
+                <div class="camera-label">Your Hand</div>
+            </div>
+
+            <!-- Gem Display Section -->
+            <div class="gem-section">
+                <div class="gem-container">
+                    <div class="gem-holder">
+                        <div class="gem" id="gem">
+                            <div class="gem-shine"></div>
+                            <div class="gem-inner"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="gem-info">
+                    <div class="color-name" id="colorName">Waiting...</div>
+                    <div class="color-code" id="colorCode">#000000</div>
+                </div>
+                <div class="gem-label">Your Gem</div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-title">Finger Colors:</div>
+            <div class="finger-legend">
+                <div class="legend-item">
+                    <span class="legend-color" style="background: linear-gradient(135deg, #FF3D5C, #FF6B7A);"></span>
+                    <span>Thumb - Red</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: linear-gradient(135deg, #FFB800, #FFC800);"></span>
+                    <span>Index - Gold</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: linear-gradient(135deg, #00D9FF, #00F0FF);"></span>
+                    <span>Middle - Cyan</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: linear-gradient(135deg, #6B4EFF, #9B7AFF);"></span>
+                    <span>Ring - Purple</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color" style="background: linear-gradient(135deg, #00D166, #4AFF00);"></span>
+                    <span>Pinky - Green</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
