@@ -159,6 +159,26 @@ body {
     display: none; /* shown only on mobile */
 }
 
+/* Camera toggle button (top-right) */
+.camera-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 30;
+    background: rgba(0,0,0,0.4);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 8px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 700;
+    backdrop-filter: blur(6px);
+}
+
+@media (max-width: 480px) {
+    .camera-toggle { padding: 6px 8px; font-size: 0.85em; }
+}
+
 /* In-app browser notice */
 .in-app-notice {
     position: fixed;
