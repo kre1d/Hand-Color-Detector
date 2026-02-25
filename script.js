@@ -407,6 +407,52 @@ if (mobileStart) {
             console.error('Permission error:', err);
             mobileStart.textContent = 'Tap to enable camera';
             showError('Camera permission denied or unavailable.');
+            // If in-app browser, show the notice explaining to open in Safari
+            if (isInAppBrowser()) {
+                showInAppNotice();
+            }
         }
+    });
+}
+
+// Helper: detect common in-app browser user agents (Messenger, Instagram, FB, etc.)
+function isInAppBrowser() {
+    const ua = navigator.userAgent || '';
+    // common markers: FBAN, FBAV, Instagram, Messenger, Line
+    return /FBAN|FBAV|Instagram|Messenger|Line|Twitter|FB_IAB|FB4A|Instagram|WhatsApp/i.test(ua);
+}
+
+// Show/hide the in-app browser notice
+function showInAppNotice() {
+    const notice = document.getElementById('inAppNotice');
+    if (!notice) return;
+    notice.style.display = 'block';
+    notice.setAttribute('aria-hidden', 'false');
+}
+
+function hideInAppNotice() {
+    const notice = document.getElementById('inAppNotice');
+    if (!notice) return;
+    notice.style.display = 'none';
+    notice.setAttribute('aria-hidden', 'true');
+}
+
+// Wire up in-app notice buttons
+const openExternalBtn = document.getElementById('openExternal');
+const dismissInAppBtn = document.getElementById('dismissInApp');
+if (openExternalBtn) {
+    openExternalBtn.addEventListener('click', () => {
+        // Try to open in external browser/tab
+        try {
+            window.open(window.location.href, '_blank');
+        } catch (e) {
+            // fallback: instruct user to manually open in Safari
+            alert('Please open this page in Safari or your device browser for camera access.');
+        }
+    });
+}
+if (dismissInAppBtn) {
+    dismissInAppBtn.addEventListener('click', () => {
+        hideInAppNotice();
     });
 }
