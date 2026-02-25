@@ -21,6 +21,7 @@ let camera = null;
 let hands = null;
 let manualStreamActive = false;
 let manualStream = null;
+let currentFacing = 'user'; // default to front camera on phones
 
 // Initialize Hands model
 async function initializeHands() {
@@ -39,9 +40,9 @@ async function initializeHands() {
     console.log('Hands model initialized');
 }
 
-// Setup camera
-async function setupCamera() {
-    camera = new Camera(videoElement, {
+// Setup camera (accept optional facingMode)
+async function setupCamera(facingMode = null) {
+    const cameraOptions = {
         onFrame: async () => {
             if (hands) {
                 await hands.send({ image: videoElement });
@@ -49,7 +50,9 @@ async function setupCamera() {
         },
         width: 640,
         height: 480
-    });
+    };
+    if (facingMode) cameraOptions.facingMode = facingMode;
+    camera = new Camera(videoElement, cameraOptions);
 }
 
 // Initialize camera and start detection
@@ -60,7 +63,7 @@ async function initializeCamera() {
             console.log('Manual stream active - skipping MediaPipe Camera initialization');
             return;
         }
-        await setupCamera();
+        await setupCamera(currentFacing);
         await camera.initialize();
         
         // Wait for camera to be ready
@@ -420,6 +423,41 @@ if (mobileStart) {
     });
 }
 
+// Switch camera between 'user' and 'environment'
+async function toggleCamera() {
+    currentFacing = (currentFacing === 'user') ? 'environment' : 'user';
+    console.log('Switching camera to', currentFacing);
+
+    // If using manual stream, stop current and request a new one
+    if (manualStreamActive && manualStream) {
+        manualStream.getTracks().forEach(t => t.stop());
+        manualStreamActive = false;
+        manualStream = null;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacing } });
+            await startStreamProcessing(stream);
+        } catch (err) {
+            console.error('Error switching manual stream:', err);
+            showError('Failed to switch camera.');
+        }
+        return;
+    }
+
+    // If using MediaPipe Camera, reinitialize it with new facing mode
+    try {
+        if (camera) {
+            camera.stop();
+            camera = null;
+        }
+        await setupCamera(currentFacing);
+        await camera.initialize();
+        camera.start();
+    } catch (err) {
+        console.error('Error switching camera with MediaPipe Camera util:', err);
+        showError('Failed to switch camera.');
+    }
+}
+
 // Helper: detect common in-app browser user agents (Messenger, Instagram, FB, etc.)
 function isInAppBrowser() {
     const ua = navigator.userAgent || '';
@@ -473,5 +511,18 @@ if (openExternalBtn) {
 if (dismissInAppBtn) {
     dismissInAppBtn.addEventListener('click', () => {
         hideInAppNotice();
+    });
+}
+
+// Wire up camera toggle button
+const cameraToggleBtn = document.getElementById('cameraToggle');
+if (cameraToggleBtn) {
+    cameraToggleBtn.addEventListener('click', async () => {
+        try {
+            await toggleCamera();
+        } catch (e) {
+            console.error('Toggle camera error:', e);
+            showError('Unable to toggle camera.');
+        }
     });
 }
