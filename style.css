@@ -141,6 +141,71 @@ body {
     animation: pulse 1s ease-in-out infinite;
 }
 
+/* Mobile start overlay */
+.mobile-start {
+    position: absolute;
+    z-index: 20;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, rgba(107,78,255,0.95), rgba(0,217,255,0.95));
+    color: white;
+    padding: 12px 18px;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    display: none; /* shown only on mobile */
+}
+
+/* In-app browser notice */
+.in-app-notice {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: 24px;
+    z-index: 9999;
+    background: linear-gradient(135deg, rgba(11,25,41,0.98), rgba(26,42,74,0.98));
+    border: 1px solid rgba(107,78,255,0.18);
+    color: var(--text-light);
+    padding: 14px;
+    border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.45);
+    display: none;
+}
+
+.in-app-notice .in-app-inner p {
+    margin: 0 0 10px 0;
+    font-size: 0.95em;
+}
+
+.in-app-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.in-app-actions .btn {
+    background: linear-gradient(135deg, #6B4EFF, #00D9FF);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.in-app-actions .btn.ghost {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* Show in-app notice on small screens by default (script will toggle) */
+@media (max-width: 768px) {
+    .in-app-notice { display: none; }
+}
+
 .finger-dot.active {
     display: block;
 }
@@ -703,5 +768,9 @@ body {
 
     .container {
         min-height: 100dvh;
+    }
+    /* show mobile start overlay on phones */
+    .mobile-start {
+        display: block;
     }
 }
